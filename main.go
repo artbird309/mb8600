@@ -4,12 +4,18 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/AdamJacobMuller/golib"
+	"github.com/influxdata/influxdb/client/v2"
+	"github.com/namsral/flag"
+	log "github.com/sirupsen/logrus"
 )
 
 type GetMultipleHNAPsResponseTop struct {
@@ -172,44 +178,176 @@ func ParseUpstreamChannelInfo(ci string) ([]*UpstreamChannelInfo, error) {
 	return channels, nil
 }
 
+func x() {
+	_ = golib.JSON_PP
+}
+
 func main() {
-	buf := bytes.NewBufferString(`{"GetMultipleHNAPs":{"GetMotoStatusDownstreamChannelInfo":"","GetMotoStatusUpstreamChannelInfo":""}}`)
+	httpClient := &http.Client{}
 
-	request, err := http.NewRequest("POST", "http://192.168.100.1/HNAP1/", buf)
+	hostname, err := os.Hostname()
 	if err != nil {
 		panic(err)
 	}
 
-	request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
+	var mac, influxdb_address, influxdb_database string
+	flag.StringVar(&mac, "mac", "", "mac address of router")
+	flag.StringVar(&influxdb_address, "influxdb-address", "", "influxdb address")
+	flag.StringVar(&influxdb_database, "influxdb-database", "", "influxdb database")
+	flag.Parse()
 
-	client := &http.Client{}
-
-	response, err := client.Do(request)
+	influxClient, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr: influxdb_address,
+	})
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error":   err,
+			"address": influxdb_address,
+		}).Panic("unable to create new influx HTTP client")
 	}
 
-	body, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		panic(err)
-	}
+	for ts := range time.Tick(time.Second * 30) {
+		start := time.Now()
+		buf := bytes.NewBufferString(`{"GetMultipleHNAPs":{"GetMotoStatusDownstreamChannelInfo":"","GetMotoStatusUpstreamChannelInfo":""}}`)
 
-	decodedResponse := &GetMultipleHNAPsResponseTop{}
-	err = json.Unmarshal(body, decodedResponse)
-	if err != nil {
-		panic(err)
-	}
-	golib.JSON_PP(decodedResponse)
+		request, err := http.NewRequest("POST", "http://192.168.100.1/HNAP1/", buf)
+		if err != nil {
+			panic(err)
+		}
 
-	downstreamChannels, err := ParseDownstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusDownstreamChannelInfoResponse.MotoConnDownstreamChannel)
-	if err != nil {
-		panic(err)
-	}
-	golib.JSON_PP(downstreamChannels)
+		request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
 
-	upstreamChannels, err := ParseUpstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusUpstreamChannelInfoResponse.MotoConnUpstreamChannel)
-	if err != nil {
-		panic(err)
+		response, err := httpClient.Do(request)
+		if err != nil {
+			panic(err)
+		}
+
+		body, err := ioutil.ReadAll(response.Body)
+		if err != nil {
+			panic(err)
+		}
+		log.WithFields(log.Fields{
+			"status": response.Status,
+			"took":   time.Since(start),
+		}).Info("got response")
+
+		decodedResponse := &GetMultipleHNAPsResponseTop{}
+		err = json.Unmarshal(body, decodedResponse)
+		if err != nil {
+			panic(err)
+		}
+		//golib.JSON_PP(decodedResponse)
+
+		downstreamChannels, err := ParseDownstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusDownstreamChannelInfoResponse.MotoConnDownstreamChannel)
+		if err != nil {
+			panic(err)
+		}
+		//golib.JSON_PP(downstreamChannels)
+
+		upstreamChannels, err := ParseUpstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusUpstreamChannelInfoResponse.MotoConnUpstreamChannel)
+		if err != nil {
+			panic(err)
+		}
+		//golib.JSON_PP(upstreamChannels)
+
+		bp, err := client.NewBatchPoints(client.BatchPointsConfig{
+			Database:  influxdb_database,
+			Precision: "s",
+		})
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error":    err,
+				"address":  influxdb_address,
+				"database": influxdb_database,
+			}).Panic("unable to create new influx batch points")
+		}
+
+		/*
+			type UpstreamChannelInfo struct {
+				Channel    int    // 0
+				Status     string // 1
+				Modulation string // 2
+
+				CMTSChannel  int     // 3
+				SymbolRate   int     // 4
+				SignalCenter float64 // 5
+				LaunchPower  float64 // 6
+			}
+
+		*/
+		for _, upstreamChannel := range upstreamChannels {
+			tags := map[string]string{
+				"hostname":      hostname,
+				"mac":           mac,
+				"signal-center": fmt.Sprintf("%f", upstreamChannel.SignalCenter),
+				"channel":       fmt.Sprintf("%d", upstreamChannel.Channel),
+			}
+			fields := map[string]interface{}{
+				"cmts-channel":  upstreamChannel.CMTSChannel,
+				"signal-center": upstreamChannel.SignalCenter,
+				"symbol-rate":   upstreamChannel.SymbolRate,
+				"launch-power":  upstreamChannel.LaunchPower,
+			}
+			point, err := client.NewPoint("upstream_channels", tags, fields, ts)
+			if err != nil {
+				panic(err)
+			}
+			bp.AddPoint(point)
+		}
+
+		/*
+			// 1^Locked^QAM256^3^477.0^ 4.4^40.9^2135^0^
+			type DownstreamChannelInfo struct {
+				Channel    int    // 0
+				Status     string // 1
+				Modulation string // 2
+
+				CMTSChannel       int     // 3
+				SignalCenter      float64 // 4
+				SignalStrength    float64 // 5
+				SNR               float64 // 6
+				CorrectedErrors   int     // 7
+				UncorrectedErrors int     // 8
+			}
+		*/
+		for _, downstreamChannel := range downstreamChannels {
+			tags := map[string]string{
+				"hostname":      hostname,
+				"mac":           mac,
+				"signal-center": fmt.Sprintf("%f", downstreamChannel.SignalCenter),
+				"channel":       fmt.Sprintf("%d", downstreamChannel.Channel),
+			}
+			fields := map[string]interface{}{
+				"cmts-channel":       downstreamChannel.CMTSChannel,
+				"signal-center":      downstreamChannel.SignalCenter,
+				"signal-strength":    downstreamChannel.SignalStrength,
+				"snr":                downstreamChannel.SNR,
+				"corrected-errors":   downstreamChannel.CorrectedErrors,
+				"uncorrected-errors": downstreamChannel.UncorrectedErrors,
+			}
+			point, err := client.NewPoint("downstream_channels", tags, fields, ts)
+			if err != nil {
+				panic(err)
+			}
+			bp.AddPoint(point)
+		}
+
+		bpc := len(bp.Points())
+		if bpc == 0 {
+			continue
+		} else {
+			log.WithFields(log.Fields{
+				"points": bpc,
+			}).Info("writing to influxdb")
+		}
+
+		err = influxClient.Write(bp)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("writing to influxdb failed")
+			continue
+		}
+
 	}
-	golib.JSON_PP(upstreamChannels)
 }
