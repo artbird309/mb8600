@@ -187,7 +187,10 @@ func main() {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		panic(err)
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Panic("unable to lookup hostname")
+
 	}
 
 	var mac, influxdb_address, influxdb_database string
@@ -212,19 +215,28 @@ func main() {
 
 		request, err := http.NewRequest("POST", "http://192.168.100.1/HNAP1/", buf)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to create new HTTP request")
+			continue
 		}
 
 		request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
 
 		response, err := httpClient.Do(request)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to make HTTP request")
+			continue
 		}
 
 		body, err := ioutil.ReadAll(response.Body)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to read response body")
+			continue
 		}
 		log.WithFields(log.Fields{
 			"status": response.Status,
@@ -234,19 +246,28 @@ func main() {
 		decodedResponse := &GetMultipleHNAPsResponseTop{}
 		err = json.Unmarshal(body, decodedResponse)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to unmarshal response body")
+			continue
 		}
 		//golib.JSON_PP(decodedResponse)
 
 		downstreamChannels, err := ParseDownstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusDownstreamChannelInfoResponse.MotoConnDownstreamChannel)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to parse downstream channel info")
+			continue
 		}
 		//golib.JSON_PP(downstreamChannels)
 
 		upstreamChannels, err := ParseUpstreamChannelInfo(decodedResponse.GetMultipleHNAPsResponse.GetMotoStatusUpstreamChannelInfoResponse.MotoConnUpstreamChannel)
 		if err != nil {
-			panic(err)
+			log.WithFields(log.Fields{
+				"error": err,
+			}).Error("unable to parse upstream channel info")
+			continue
 		}
 		//golib.JSON_PP(upstreamChannels)
 
@@ -259,7 +280,8 @@ func main() {
 				"error":    err,
 				"address":  influxdb_address,
 				"database": influxdb_database,
-			}).Panic("unable to create new influx batch points")
+			}).Error("unable to create new influx batch points")
+			continue
 		}
 
 		/*
@@ -290,7 +312,12 @@ func main() {
 			}
 			point, err := client.NewPoint("upstream_channels", tags, fields, ts)
 			if err != nil {
-				panic(err)
+				log.WithFields(log.Fields{
+					"error":  err,
+					"tags":   tags,
+					"fields": fields,
+				}).Error("unable to create point for upstream_channels")
+				continue
 			}
 			bp.AddPoint(point)
 		}
@@ -327,7 +354,14 @@ func main() {
 			}
 			point, err := client.NewPoint("downstream_channels", tags, fields, ts)
 			if err != nil {
-				panic(err)
+				if err != nil {
+					log.WithFields(log.Fields{
+						"error":  err,
+						"tags":   tags,
+						"fields": fields,
+					}).Error("unable to create point for downstream_channels")
+					continue
+				}
 			}
 			bp.AddPoint(point)
 		}
