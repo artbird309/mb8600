@@ -344,12 +344,15 @@ func main() {
 				"mac":           mac,
 				"signal-center": fmt.Sprintf("%f", upstreamChannel.SignalCenter),
 				"channel":       fmt.Sprintf("%d", upstreamChannel.Channel),
+				"modulation":    upstreamChannel.Modulation,
 			}
 			fields := map[string]interface{}{
 				"cmts-channel":  upstreamChannel.CMTSChannel,
 				"signal-center": upstreamChannel.SignalCenter,
 				"symbol-rate":   upstreamChannel.SymbolRate,
 				"launch-power":  upstreamChannel.LaunchPower,
+				"status":        upstreamChannel.Status,
+				"modulation":    upstreamChannel.Modulation,
 			}
 			point, err := client.NewPoint("upstream_channels", tags, fields, ts)
 			if err != nil {
@@ -384,6 +387,7 @@ func main() {
 				"mac":           mac,
 				"signal-center": fmt.Sprintf("%f", downstreamChannel.SignalCenter),
 				"channel":       fmt.Sprintf("%d", downstreamChannel.Channel),
+				"modulation":    downstreamChannel.Modulation,
 			}
 			fields := map[string]interface{}{
 				"cmts-channel":       downstreamChannel.CMTSChannel,
@@ -392,6 +396,8 @@ func main() {
 				"snr":                downstreamChannel.SNR,
 				"corrected-errors":   downstreamChannel.CorrectedErrors,
 				"uncorrected-errors": downstreamChannel.UncorrectedErrors,
+				"status":             downstreamChannel.Status,
+				"modulation":         downstreamChannel.Modulation,
 			}
 			point, err := client.NewPoint("downstream_channels", tags, fields, ts)
 			if err != nil {
