@@ -339,20 +339,14 @@ func main() {
 		*/
 		for _, upstreamChannel := range upstreamChannels {
 			tags := map[string]string{
-				"hostname":      hostname,
-				"signal-center": fmt.Sprintf("%f", upstreamChannel.SignalCenter),
-				"channel":       fmt.Sprintf("%d", upstreamChannel.Channel),
-				"modulation":    upstreamChannel.Modulation,
+				"frequency": fmt.Sprintf("%f", upstreamChannel.SignalCenter),
+				"channelId": fmt.Sprintf("%d", upstreamChannel.Channel),
 			}
 			fields := map[string]interface{}{
-				"cmts-channel":  upstreamChannel.CMTSChannel,
-				"signal-center": upstreamChannel.SignalCenter,
-				"symbol-rate":   upstreamChannel.SymbolRate,
-				"launch-power":  upstreamChannel.LaunchPower,
-				"status":        upstreamChannel.Status,
-				"modulation":    upstreamChannel.Modulation,
+				"symbolRate": upstreamChannel.SymbolRate,
+				"power":      upstreamChannel.LaunchPower,
 			}
-			point, err := client.NewPoint("upstream_channels", tags, fields, ts)
+			point, err := client.NewPoint("upstream", tags, fields, ts)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error":  err,
@@ -381,22 +375,16 @@ func main() {
 		*/
 		for _, downstreamChannel := range downstreamChannels {
 			tags := map[string]string{
-				"hostname":      hostname,
-				"signal-center": fmt.Sprintf("%f", downstreamChannel.SignalCenter),
-				"channel":       fmt.Sprintf("%d", downstreamChannel.Channel),
-				"modulation":    downstreamChannel.Modulation,
+				"frequency": fmt.Sprintf("%f", downstreamChannel.SignalCenter),
+				"channelId": fmt.Sprintf("%d", downstreamChannel.Channel),
 			}
 			fields := map[string]interface{}{
-				"cmts-channel":       downstreamChannel.CMTSChannel,
-				"signal-center":      downstreamChannel.SignalCenter,
-				"signal-strength":    downstreamChannel.SignalStrength,
-				"snr":                downstreamChannel.SNR,
-				"corrected-errors":   downstreamChannel.CorrectedErrors,
-				"uncorrected-errors": downstreamChannel.UncorrectedErrors,
-				"status":             downstreamChannel.Status,
-				"modulation":         downstreamChannel.Modulation,
+				"power":       downstreamChannel.SignalStrength,
+				"snr":         downstreamChannel.SNR,
+				"corrected":   downstreamChannel.CorrectedErrors,
+				"uncorrected": downstreamChannel.UncorrectedErrors,
 			}
-			point, err := client.NewPoint("downstream_channels", tags, fields, ts)
+			point, err := client.NewPoint("downstream", tags, fields, ts)
 			if err != nil {
 				if err != nil {
 					log.WithFields(log.Fields{
