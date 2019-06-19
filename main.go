@@ -349,6 +349,20 @@ func main() {
 			bgChannel <- point
 		}
 
+		tags := map[string]string{}
+		fields := map[string]interface{}{
+			"number": len(upstreamChannels),
+		}
+		point, err := client.NewPoint("upstreamBonded", tags, fields, ts)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error":  err,
+				"tags":   tags,
+				"fields": fields,
+			}).Error("unable to create point for upstreamBonded")
+		}
+		bgChannel <- point
+
 		/*
 			// 1^Locked^QAM256^3^477.0^ 4.4^40.9^2135^0^
 			type DownstreamChannelInfo struct {
@@ -388,5 +402,19 @@ func main() {
 			}
 			bgChannel <- point
 		}
+
+		tags = map[string]string{}
+		fields = map[string]interface{}{
+			"number": len(downstreamChannels),
+		}
+		point, err = client.NewPoint("downstreamBonded", tags, fields, ts)
+		if err != nil {
+			log.WithFields(log.Fields{
+				"error":  err,
+				"tags":   tags,
+				"fields": fields,
+			}).Error("unable to create point for downstreamBonded")
+		}
+		bgChannel <- point
 	}
 }
