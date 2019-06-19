@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -237,14 +236,6 @@ func NewInfluxBGWriter(influxClient client.Client, database string) (chan<- *cli
 
 func main() {
 	httpClient := &http.Client{}
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.WithFields(log.Fields{
-			"error": err,
-		}).Panic("unable to lookup hostname")
-
-	}
 
 	var influxdb_address, influxdb_database string
 	flag.StringVar(&influxdb_address, "influxdb-address", "", "influxdb address")
