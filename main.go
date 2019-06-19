@@ -246,8 +246,7 @@ func main() {
 
 	}
 
-	var mac, influxdb_address, influxdb_database string
-	flag.StringVar(&mac, "mac", "", "mac address of router")
+	var influxdb_address, influxdb_database string
 	flag.StringVar(&influxdb_address, "influxdb-address", "", "influxdb address")
 	flag.StringVar(&influxdb_database, "influxdb-database", "", "influxdb database")
 	flag.Parse()
@@ -341,7 +340,6 @@ func main() {
 		for _, upstreamChannel := range upstreamChannels {
 			tags := map[string]string{
 				"hostname":      hostname,
-				"mac":           mac,
 				"signal-center": fmt.Sprintf("%f", upstreamChannel.SignalCenter),
 				"channel":       fmt.Sprintf("%d", upstreamChannel.Channel),
 				"modulation":    upstreamChannel.Modulation,
@@ -384,7 +382,6 @@ func main() {
 		for _, downstreamChannel := range downstreamChannels {
 			tags := map[string]string{
 				"hostname":      hostname,
-				"mac":           mac,
 				"signal-center": fmt.Sprintf("%f", downstreamChannel.SignalCenter),
 				"channel":       fmt.Sprintf("%d", downstreamChannel.Channel),
 				"modulation":    downstreamChannel.Modulation,
