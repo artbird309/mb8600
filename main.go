@@ -269,7 +269,7 @@ func main() {
 		tr := &http.Transport{
 			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		hc := &http.Client{Timeout: 2 * time.Second, Transport: tr}
+		hc := &http.Client{Timeout: 15 * time.Second, Transport: tr}
 
 		response, err := hc.Do(request)
 		if err != nil {
