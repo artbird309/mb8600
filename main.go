@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -235,8 +236,6 @@ func NewInfluxBGWriter(influxClient client.Client, database string) (chan<- *cli
 }
 
 func main() {
-	httpClient := &http.Client{}
-
 	var influxdb_address, influxdb_database string
 	flag.StringVar(&influxdb_address, "influxdb-address", "", "influxdb address")
 	flag.StringVar(&influxdb_database, "influxdb-database", "", "influxdb database")
@@ -257,7 +256,7 @@ func main() {
 		start := time.Now()
 		buf := bytes.NewBufferString(`{"GetMultipleHNAPs":{"GetMotoStatusDownstreamChannelInfo":"","GetMotoStatusUpstreamChannelInfo":""}}`)
 
-		request, err := http.NewRequest("POST", "http://192.168.100.1/HNAP1/", buf)
+		request, err := http.NewRequest("POST", "https://192.168.100.1/HNAP1/", buf)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
@@ -267,7 +266,12 @@ func main() {
 
 		request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
 
-		response, err := httpClient.Do(request)
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		hc := &http.Client{Timeout: 2 * time.Second, Transport: tr}
+
+		response, err := hc.Do(request)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
