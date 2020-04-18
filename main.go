@@ -18,6 +18,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var protocol = "https"
+
 type GetMultipleHNAPsResponseTop struct {
 	GetMultipleHNAPsResponse struct {
 		GetMotoStatusDownstreamChannelInfoResponse struct {
@@ -239,6 +241,7 @@ func main() {
 	var influxdb_address, influxdb_database string
 	flag.StringVar(&influxdb_address, "influxdb-address", "", "influxdb address")
 	flag.StringVar(&influxdb_database, "influxdb-database", "", "influxdb database")
+	flag.StringVar(&protocol, "protocol", "", "http or https for modem")
 	flag.Parse()
 
 	influxClient, err := client.NewHTTPClient(client.HTTPConfig{
@@ -254,24 +257,7 @@ func main() {
 
 	for ts := range time.Tick(time.Second * 30) {
 		start := time.Now()
-		buf := bytes.NewBufferString(`{"GetMultipleHNAPs":{"GetMotoStatusDownstreamChannelInfo":"","GetMotoStatusUpstreamChannelInfo":""}}`)
-
-		request, err := http.NewRequest("POST", "https://192.168.100.1/HNAP1/", buf)
-		if err != nil {
-			log.WithFields(log.Fields{
-				"error": err,
-			}).Error("unable to create new HTTP request")
-			continue
-		}
-
-		request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
-
-		tr := &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-		}
-		hc := &http.Client{Timeout: 2 * time.Second, Transport: tr}
-
-		response, err := hc.Do(request)
+		err, response := getModemData()
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error": err,
@@ -395,14 +381,12 @@ func main() {
 			}
 			point, err := client.NewPoint("downstream", tags, fields, ts)
 			if err != nil {
-				if err != nil {
-					log.WithFields(log.Fields{
-						"error":  err,
-						"tags":   tags,
-						"fields": fields,
-					}).Error("unable to create point for downstream_channels")
-					continue
-				}
+				log.WithFields(log.Fields{
+					"error":  err,
+					"tags":   tags,
+					"fields": fields,
+				}).Error("unable to create point for downstream_channels")
+				continue
 			}
 			bgChannel <- point
 		}
@@ -420,5 +404,39 @@ func main() {
 			}).Error("unable to create point for downstreamBonded")
 		}
 		bgChannel <- point
+	}
+}
+
+func getModemData() (error, *http.Response) {
+	buf := bytes.NewBufferString(`{"GetMultipleHNAPs":{"GetMotoStatusDownstreamChannelInfo":"","GetMotoStatusUpstreamChannelInfo":""}}`)
+	request, err := http.NewRequest("POST", protocol + "://192.168.100.1/HNAP1/", buf)
+	if err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Error("unable to create new HTTP request")
+		return err, nil
+	}
+	request.Header.Add("SOAPACTION", `"http://purenetworks.com/HNAP1/GetMultipleHNAPs"`)
+	switch protocol {
+	case "https":
+		tr := &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+		}
+		httpClient := &http.Client{Timeout: 2 * time.Second, Transport: tr}
+		response, err := httpClient.Do(request)
+		if err != nil {
+			protocol = "http"
+		}
+		return err, response
+	case "http":
+		httpClient := http.Client{}
+		response, err := httpClient.Do(request)
+		return err, response
+		if err != nil {
+			protocol = "https"
+		}
+		return err, response
+	default:
+		return errors.New("unknown protocol"), nil
 	}
 }
