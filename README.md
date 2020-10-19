@@ -7,8 +7,4 @@ together here in https://github.com/mattund/modem-statistics, which creates a be
 
 ![Screenshot of dashboard](https://camo.githubusercontent.com/f24a3eaafd1f4ac397f5b888b7c62c7efb366901/68747470733a2f2f692e696d6775722e636f6d2f3049764471656a2e706e67)
 
-You probably want to use
-https://github.com/mcolyer/hassio-addons/tree/master/mb8600, so that you
-can easily install it in your home assistant install.  You'll also need
-the influxdb addon and the grafana addon but otherwise it should work
-out of the box.
+You probably want to use https://github.com/artbird309/MB8600-Docker-Image, to build a docker container to run this script in.  You'll also need have a influxdb 1.x server and the grafana server running to get everything to work.
